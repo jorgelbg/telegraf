@@ -730,6 +730,51 @@ func TestJolokia2_ProxyTargets(t *testing.T) {
 	})
 }
 
+func TestJolokia2_SinglePathWithFieldPrefix(t *testing.T) {
+	config := `
+	[jolokia2_agent]
+		urls = ["%s"]
+
+	[[jolokia2_agent.metric]]
+		name         = "topics"
+		mbean        = "kafka.server:name=*,type=BrokerTopicMetrics"
+		paths        = ["OneMinuteRate"]
+		field_prefix = "$1."
+`
+
+	response := `
+	[
+		{
+		  "request": {
+			"mbean": "kafka.server:name=*,type=BrokerTopicMetrics",
+			"attribute": "OneMinuteRate",
+			"type": "read"
+		  },
+		  "value": {
+			"kafka.server:name=BytesInPerSec,type=BrokerTopicMetrics": {
+			  "OneMinuteRate": 1642909.2064396732
+			}
+		  },
+		  "timestamp": 1539852739,
+		  "status": 200
+		}
+	  ]
+`
+
+	server := setupServer(http.StatusOK, response)
+	defer server.Close()
+	plugin := setupPlugin(t, fmt.Sprintf(config, server.URL))
+
+	var acc testutil.Accumulator
+	assert.NoError(t, plugin.Gather(&acc))
+
+	acc.AssertContainsTaggedFields(t, "topics", map[string]interface{}{
+		"BytesInPerSec.OneMinuteRate": 1642909.2064396732,
+	}, map[string]string{
+		"jolokia_agent_url": server.URL,
+	})
+}
+
 func setupServer(status int, resp string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

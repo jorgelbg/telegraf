@@ -163,7 +163,12 @@ func (pb *pointBuilder) fillFields(name string, value interface{}, fieldMap map[
 			if name == "" {
 				innerName = pb.metric.FieldPrefix + key
 			} else {
-				innerName = name + pb.metric.FieldSeparator + key
+				// avoid consecutive concatenations of key in the field name
+				if !strings.HasSuffix(name, key) {
+					innerName = name + pb.metric.FieldSeparator + key
+				} else {
+					innerName = name
+				}
 			}
 
 			pb.fillFields(innerName, innerValue, fieldMap)
